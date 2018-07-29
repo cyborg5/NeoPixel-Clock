@@ -48,15 +48,16 @@
 // but the defaults are defined here for easy access.
 #define AUDIO_DEFAULT       MODE_TIMED
 #define ANIMATION_DEFAULT   MODE_RANDOM
-#define MUSIC_DEFAULT       MODE_RANDOM
+#define MUSIC_DEFAULT       MODE_OFF
 #define CHIMES_DEFAULT      MODE_WESTMIN
+#define BRIGHT_MODE_DEFAULT MODE_ON
 #define VOICE_DEFAULT       true
 #define QUARTERLY_DEFAULT   true
 #define HOURLY_DEFAULT      true
 #define MARKS_DEFAULT       true
 #define ALARM_DEFAULT       true
-#define ALARM_HOUR          16
-#define ALARM_MINUTES       30
+#define ALARM_HOUR               7
+#define ALARM_MINUTES           30
 #define DAYTIME_START_DEFAULT   10
 #define NIGHT_BEGINS_DEFAULT    22
 #define VOLUME_DAY_DEFAULT      20
@@ -69,7 +70,7 @@
 #define LIGHT_THRESHOLD        100
 
 //fudge factor in case you don't get your pixel ring oriented properly
-#define TOP_PIXEL 3
+#define TOP_PIXEL 0
 
 //real-time clock module for SAMD21
 #include <RTCZero.h>
@@ -127,6 +128,7 @@ void updateDisplay(void);
 #endif
 
 //Global variables for time and pixel display
+uint8_t Bright_Mode= BRIGHT_MODE_DEFAULT;
 int16_t Brightness= BRIGHT_DAY_DEFAULT;
 int16_t BrightInverse= 255/BRIGHT_DAY_DEFAULT;
 int16_t Bright_Day= BRIGHT_DAY_DEFAULT;
@@ -138,7 +140,7 @@ uint8_t Hours=HOURS_DEFAULT;
 uint8_t Minutes=MINUTES_DEFAULT;
 uint8_t Seconds=0;
 uint8_t pSeconds=0;
-uint8_t Animation_State= ANIMATION_DEFAULT;
+uint8_t Animation_Mode= ANIMATION_DEFAULT;
 
 //Include code for audio, BLE and animation. 
 //Conditional compiles inside will turn them off as necessary.
@@ -196,19 +198,24 @@ void updateDisplay(void) {
   uint8_t i;
   Minutes= rtc.getMinutes();
   Hours= rtc.getHours();
+  Brightness=Bright_Day;
   //Don't mess with brightness during configuration
   if(! Doing_Configuration) {
-    if((Hours<Day_Begins_Hour)  || (Hours>Night_Begins_Hour)) {//Nighttime
-      Brightness=Bright_Night;
+    if(Bright_Mode==MODE_TIMED) {
+      if((Hours<Day_Begins_Hour)  || (Hours>=Night_Begins_Hour)) {//Nighttime
+        Brightness=Bright_Night;
+      } 
     } else {
-      Brightness=Bright_Day;
+      #if(USE_PHOTOCELL)
+        if(Bright_Mode==MODE_LIGHT) {
+          if(analogRead(PHOTOCELL_PIN)<LIGHT_THRESHOLD) {  //nighttime
+            Brightness=Bright_Night;
+          }
+        }
+      #endif
     }
     BrightInverse= 255/Brightness;
   }
-  #if(MY_DEBUG)
-    Serial.print("BrightInverse:"); Serial.print(BrightInverse,DEC); 
-    Serial.print("  Brightness:"); Serial.println(Brightness,DEC);
-  #endif
   strip.clear();    //erase everything
   if (Marks) {      //draw the tick marks every five minutes if enabled
     uint8_t val=(Brightness)?max(Brightness*0.3,1):0;
@@ -227,7 +234,7 @@ void updateDisplay(void) {
   strip.setPixelColor((TOP_PIXEL+Minutes)%60, Brightness,0,0);
   strip.setPixelColor((TOP_PIXEL+Seconds)%60, 0,Brightness,0);
   strip.show();  
-  #if(MY_DEBUG)
+  #if(MY_DEBUG*0)
     Serial.print("Time="); 
     if(Hours<10) Serial.print("0");
     Serial.print(Hours,DEC); Serial.print(":"); 
@@ -237,6 +244,13 @@ void updateDisplay(void) {
     Serial.println(Seconds,DEC); 
   #endif
  if (Seconds==0) {
+    #if(MY_DEBUG && USE_PHOTOCELL)
+      if((Minutes % 15)==0) {
+        Serial.print("Photocell value:");
+        Serial.print(analogRead(PHOTOCELL_PIN),DEC);
+        Serial.print("\t");
+      }
+    #endif
     do_Audio();
     if (Minutes==0) {
       do_Animation();
@@ -247,7 +261,22 @@ void updateDisplay(void) {
 
 //Gets a command from either IR, BLE, or touch controls and returns a value
 uint8_t Get_Command(void) {
- uint8_t Value=NO_COMMAND;
+  uint8_t Value=NO_COMMAND;
+  #if(MY_DEBUG)
+    if (Serial.available()) {
+      uint8_t C= Serial.read();
+      C=toupper(C);
+      switch(C) {
+        case 'U': Value=UP_ARROW; break;
+        case 'D': Value=DOWN_ARROW; break;
+        case 'L': Value=LEFT_ARROW; break;
+        case 'R': Value=RIGHT_ARROW; break;
+        case 'S': Value=SETUP; break;
+        case 'P': Value=PLAY; break;
+        case 'T': Value=RESET; break;
+      }
+    }
+  #endif
   #if(USE_IR)
     if (myReceiver.getResults()) {//was a command received by IR?
       if (myDecoder.decode()){    //is that the right protocol?

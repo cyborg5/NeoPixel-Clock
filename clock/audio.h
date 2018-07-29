@@ -212,8 +212,8 @@ void SpeakTime(uint8_t Hrs,uint8_t Mins) {
 //Is invoked at the top of the hour and anytime you get the "Play" button.
 void do_Music(void) {
   uint8_t H= Hours% 12;
-  if(Music_State==MODE_OFF) return;
-  if(Music_State==MODE_RANDOM) H=random(12);
+  if(Music_Mode==MODE_OFF) return;
+  if(Music_Mode==MODE_RANDOM) H=random(12);
   DEBUG("Playing music:"); DEBUG(H); 
   switch(H) {
     case  1: MESSAGE("music01.mp3","\n");break;
@@ -234,14 +234,9 @@ void do_Music(void) {
 //Handles all audio that is time based such as chimes, quarterly or hourly voice etc.
 //Only called when seconds==0
 void do_Audio(void) {
-  if((Audio_State==MODE_OFF) || Doing_Configuration) return;
+  if((Audio_Mode==MODE_OFF) || Doing_Configuration) return;
   uint8_t Count;
-  #if(MY_DEBUG && USE_PHOTOCELL)
-    if((Minutes % 15)==0) {
-      Serial.print(analogRead(PHOTOCELL_PIN),DEC);Serial.print("\t");
-    }
-  #endif
-  if((Hours<Day_Begins_Hour)  || (Hours>Night_Begins_Hour) && (Audio_State==MODE_TIMED)) {//Nighttime
+  if((Hours<Day_Begins_Hour)  || (Hours>=Night_Begins_Hour) && (Audio_Mode==MODE_TIMED)) {//Nighttime
     if(AudioNighttime>=VOLUME_THRESHOLD) {//Note lower numbers mean higher volume
       //essentially muted so do nothing
       return;
@@ -249,12 +244,8 @@ void do_Audio(void) {
     musicPlayer.setVolume(AudioNighttime,AudioNighttime);
   } else {
     #if(USE_PHOTOCELL)
-      if(Audio_State== MODE_LIGHT) {
-        uint16_t Light= analogRead(PHOTOCELL_PIN);
-        #if(MY_DEBUG)
-          Serial.print("Photocell value:"); Serial.println(Light,DEC);
-        #endif
-        if (Light<LIGHT_THRESHOLD) {  //nighttime
+      if(Audio_Mode== MODE_LIGHT) {
+        if(analogRead(PHOTOCELL_PIN)<LIGHT_THRESHOLD) {  //nighttime
           if(AudioNighttime<VOLUME_THRESHOLD) {//essentially muted so do nothing
             return;
           }
@@ -267,7 +258,7 @@ void do_Audio(void) {
       musicPlayer.setVolume(AudioDaytime,AudioDaytime);
     #endif
   }
-  if(Quarterly_Enable && (Chimes_State==MODE_WESTMIN)) {
+  if(Quarterly_Enable && (Chimes_Mode==MODE_WESTMIN)) {
     switch(Minutes) {
       case 15: MESSAGE("west1q.mp3", "Quarter after the hour\n"); break;
       case 30: MESSAGE("west2q.mp3", "Half past the hour\n"); break;
@@ -275,10 +266,10 @@ void do_Audio(void) {
       case 00: MESSAGE("west4q.mp3", "Top of the hour\n"); 
     }
   }
-  if(Chimes_State && Hourly_Enable && (Minutes==0)) {
+  if(Chimes_Mode && Hourly_Enable && (Minutes==0)) {
     Count=Hours%12;
     if (Count==0) Count=12;
-    if(Chimes_State==MODE_WESTMIN) {
+    if(Chimes_Mode==MODE_WESTMIN) {
       Count--;//Final gong is different so only do the first Count-1
       for(uint8_t i=0; i< Count;i++) {
         MESSAGE("wgong_1.mp3", "Gong, ");

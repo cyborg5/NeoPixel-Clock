@@ -128,8 +128,8 @@ void crissCross(uint8_t sets, uint8_t wait,uint32_t c1,uint32_t c2) {
 //Is invoked at the top of the hour and anytime you get the "Play" button.
 void do_Animation(void) {
   uint8_t H= Hours% 12;
-  if(Animation_State==MODE_OFF) return;
-  if(Animation_State==MODE_RANDOM) H=random(12);
+  if(Animation_Mode==MODE_OFF) return;
+  if(Animation_Mode==MODE_RANDOM) H=random(12);
   switch(H) {
     case  0: crissCross(3, 100, strip.Color(Brightness,0,0),strip.Color(0,Brightness,0)); break;
     case  1: crissCross(3, 100, strip.Color(Brightness,0,Brightness),strip.Color(0,Brightness,Brightness)); break;

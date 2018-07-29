@@ -1,15 +1,15 @@
 /*
  * Implements an audio menu system for setting configuration
  */
-uint8_t Audio_State= AUDIO_DEFAULT;
-uint8_t Chimes_State= CHIMES_DEFAULT;
+uint8_t Audio_Mode= AUDIO_DEFAULT;
+uint8_t Chimes_Mode= CHIMES_DEFAULT;
 uint8_t Voice_Enable= VOICE_DEFAULT;
 uint8_t Quarterly_Enable= QUARTERLY_DEFAULT;
 uint8_t Hourly_Enable= HOURLY_DEFAULT;
 uint8_t Alarm_Enable= ALARM_DEFAULT;
 uint8_t Alarm_Hour= ALARM_HOUR;
 uint8_t Alarm_Minutes= ALARM_MINUTES;
-uint8_t Music_State= MUSIC_DEFAULT;
+uint8_t Music_Mode= MUSIC_DEFAULT;
 uint8_t AudioDaytime= VOLUME_DAY_DEFAULT;
 uint8_t AudioNighttime= VOLUME_NIGHT_DEFAULT;
 uint8_t Doing_Configuration= false;
@@ -35,49 +35,57 @@ typedef const struct{
 
 //Our menu system
 const audioMenuItem_t Menus[]={
-  {"audio.mp3", "Audio mode is currently ",&Audio_State,4,
+  //If photocell unavailable, drop final menu item
+  {"audio.mp3", "Audio mode is currently ",&Audio_Mode,3+((USE_PHOTOCELL)?1:0),
     { {"disabled.mp3", "disabled.\n",MODE_OFF},
       {"continuo.mp3", "continuous.\n",MODE_ON},
       {"tbased.mp3", "time based.\n",MODE_TIMED},
       {"lbased.mp3", "light based.\n",MODE_LIGHT}
     }
   },
-  {"animate.mp3", "Animation mode is currently ",&Animation_State,3,
+  {"animate.mp3", "Animation mode is currently ",&Animation_Mode,3,
     { {"disabled.mp3", "disabled.\n",MODE_OFF},
       {"sequence.mp3", "sequential.\n",MODE_ON},
       {"random.mp3", "random.\n",MODE_RANDOM}
     }
   },
-  {"chimes.mp3", "Chimes ",&Chimes_State,3,
+  {"chimes.mp3", "Chimes are ",&Chimes_Mode,3,
     { {"disabled.mp3", "disabled.\n",MODE_OFF},
       {"westmins.mp3", "Westminster chimes.\n",MODE_WESTMIN},
       {"cuckoo.mp3", "Cuckoo clock chimes.\n",MODE_CUCKOO}
     }
   },
-  {"hourly.mp3", "Hourly ",&Hourly_Enable,2,
+  {"hourly.mp3", "Hourly audio is ",&Hourly_Enable,2,
     { {"disabled.mp3", "disabled.\n",false},
       {"enabled.mp3", "enabled.\n",true}
     }
   },
-  {"quarter.mp3", "Quarterly ",&Quarterly_Enable,2,
+  {"quarter.mp3", "Quarterly audio is ",&Quarterly_Enable,2,
     { {"disabled.mp3", "disabled.\n",false},
       {"enabled.mp3", "enabled.\n",true}
     }
   },
-  {"voice.mp3", "Voice ",&Voice_Enable,2,
+  {"voice.mp3", "Voice announcement ",&Voice_Enable,2,
     { {"disabled.mp3", "disabled.\n",false},
       {"enabled.mp3", "enabled.\n",true}
     }
   },
-  {"alarmis.mp3", "Alarm ",&Alarm_Enable,2,
+  {"alarmis.mp3", "Alarm is ",&Alarm_Enable,2,
     { {"disabled.mp3", "disabled.\n",false},
       {"enabled.mp3", "enabled.\n",true}
     }
   },
-  {"music.mp3", "Music mode is currently ",&Music_State,3,
+  {"music.mp3", "Music mode is currently ",&Music_Mode,3,
     { {"disabled.mp3", "disabled.\n",MODE_OFF},
       {"sequence.mp3", "sequential.\n",MODE_ON},
       {"random.mp3", "random.\n",MODE_RANDOM}
+    }
+  },
+  //If photocell unavailable, drop final menu item
+  {"brightm.mp3", "Brightness mode is ",&Bright_Mode,2+((USE_PHOTOCELL)?1:0),
+    { {"constant.mp3", "constant.\n",MODE_ON},
+      {"tbased.mp3", "time based.\n",MODE_TIMED},
+      {"lbased.mp3", "light based.\n",MODE_LIGHT}
     }
   }
 };
@@ -91,6 +99,7 @@ const audioMenuItem_t Menus[]={
 #define VOICE_MENU      5
 #define ALARM_MENU      6
 #define MUSIC_MENU      7
+#define BRIGHT_MENU     8
 
 //Sets a value to one of a number of optional choices
 void Configure_Menu_Items(audioMenuItem_t &Menu) {
@@ -160,11 +169,11 @@ void Update_Day_Volume(int Amount) {
 void Update_Night_Volume(int Amount) {
   AudioNighttime+= Amount;
   AudioNighttime=max(1,min(VOLUME_THRESHOLD,AudioNighttime));
+  musicPlayer.setVolume(AudioNighttime,AudioNighttime);
   MESSAGE("night.mp3","Nighttime ");
   MESSAGE("volume.mp3", "volume:");
   SpeakNumber(AudioNighttime,false);
   DEBUG("\n");
-  musicPlayer.setVolume(AudioNighttime,AudioNighttime);
 }
 
 //Callback function for alarm hours
@@ -174,7 +183,6 @@ void Update_Alarm_Hour(int Amount) {
   if(SpeakHours(Alarm_Hour,true)) {
     SpeakAMPM(Alarm_Hour);
   }
-  DEBUG("\n");
 }
 
 //Callback function for alarm minutes
@@ -219,7 +227,6 @@ void Update_Day_Begins(int Amount) {
   if(SpeakHours(Day_Begins_Hour,true)) {
     SpeakAMPM(Day_Begins_Hour);
   }
-  DEBUG("\n");
 }
 
 //Callback function for nighttime begins hour
@@ -232,10 +239,7 @@ void Update_Night_Begins(int Amount) {
   if(SpeakHours(Night_Begins_Hour,true)) {
     SpeakAMPM(Night_Begins_Hour);
   }
-  DEBUG("\n");
 }
-
-
 
 
 //Do the actual setup configuration. It's called when you press the setup button
@@ -246,29 +250,33 @@ void do_Configuration(void) {
   MESSAGE("choice.mp3", "\nPress arrows to change or advance to next item\n");
   delay(500);
   Configure_Menu_Items(Menus[AUDIO_MENU]);
-  Configure_Integer(Update_Day_Begins);
-  Configure_Integer(Update_Night_Begins);
+  Configure_Menu_Items(Menus[BRIGHT_MENU]);
+  if((Bright_Mode== MODE_TIMED) || (Audio_Mode== MODE_TIMED) ) {
+    Configure_Integer(Update_Day_Begins);
+    Configure_Integer(Update_Night_Begins);
+  }
   Configure_Integer(Update_Day_Volume);
-  if((Audio_State== MODE_TIMED)||(Audio_State== MODE_LIGHT)) {
-    musicPlayer.setVolume(AudioNighttime,AudioNighttime);
+  if((Audio_Mode== MODE_TIMED) || (Audio_Mode==MODE_LIGHT)) {
     Configure_Integer(Update_Night_Volume);
     musicPlayer.setVolume(AudioDaytime,AudioDaytime);
   }
   Configure_Integer(Update_Day_Bright);
-  Configure_Integer(Update_Night_Bright);
-  Brightness=Bright_Day;
-  BrightInverse=255/Brightness;
+  if((Bright_Mode== MODE_TIMED) || (Bright_Mode== MODE_LIGHT)) {
+    Configure_Integer(Update_Night_Bright);
+    Brightness=Bright_Day;
+    BrightInverse=255/Brightness;
+  }
   Configure_Menu_Items(Menus[CHIMES_MENU]);
+  Configure_Menu_Items(Menus[VOICE_MENU]);
   Configure_Menu_Items(Menus[HOURLY_MENU]);
   Configure_Menu_Items(Menus[QUARTERLY_MENU]);
-  Configure_Menu_Items(Menus[VOICE_MENU]);
   Configure_Menu_Items(Menus[ANIMATION_MENU]);
+  Configure_Menu_Items(Menus[MUSIC_MENU]);
   Configure_Menu_Items(Menus[ALARM_MENU]);
   if(Alarm_Enable) {
     Configure_Integer(Update_Alarm_Hour);
     Configure_Integer(Update_Alarm_Minutes);
   }
-  Configure_Menu_Items(Menus[MUSIC_MENU]);
   MESSAGE("complete.mp3", "Setup completed\n");
   Doing_Configuration= false;
 }
