@@ -198,19 +198,18 @@ void updateDisplay(void) {
   uint8_t i;
   Minutes= rtc.getMinutes();
   Hours= rtc.getHours();
-  Brightness=Bright_Day;
   //Don't mess with brightness during configuration
   if(! Doing_Configuration) {
     if(Bright_Mode==MODE_TIMED) {
       if((Hours<Day_Begins_Hour)  || (Hours>=Night_Begins_Hour)) {//Nighttime
         Brightness=Bright_Night;
-      } 
+      } else Brightness=Bright_Day;
     } else {
       #if(USE_PHOTOCELL)
         if(Bright_Mode==MODE_LIGHT) {
           if(analogRead(PHOTOCELL_PIN)<LIGHT_THRESHOLD) {  //nighttime
             Brightness=Bright_Night;
-          }
+          } else Brightness=Bright_Day;
         }
       #endif
     }
