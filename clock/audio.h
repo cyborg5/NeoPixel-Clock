@@ -26,6 +26,10 @@ Adafruit_VS1053_FilePlayer musicPlayer =
   #define DEBUG(s) 
 #endif
 
+#if(USE_USB)
+  #include "msc_sdcard.h"
+#endif
+
 uint8_t Command; 
 
 void SpeakMessage(const char* s) {
@@ -46,6 +50,9 @@ void SpeakAMPM(uint8_t Hrs);
 
 //initializes Music Maker Wing
 void Audio_Setup(void) {
+  #if(USE_USB)
+    USB_setup();//configure SD card as USB drive
+  #endif
   if (! musicPlayer.begin()) { // initialise the music player
     DEBUG("Couldn't find VS1053, do you have the right pins defined?");
     while (1);
@@ -229,6 +236,9 @@ void do_Music(void) {
     case 11: MESSAGE("music11.mp3","\n");break;
     case  0: MESSAGE("music12.mp3","\n");break;
   }
+  #if(USE_USB)
+    USB_setup();//Reinitialize USB drive which will go off-line
+  #endif
 }
 
 //Handles all audio that is time based such as chimes, quarterly or hourly voice etc.
@@ -318,5 +328,3 @@ void do_Audio(void) {
     #define DEBUG(s) 
   #endif
 #endif
-
-

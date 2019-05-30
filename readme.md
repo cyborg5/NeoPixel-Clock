@@ -10,3 +10,5 @@ Used by permission.
 
 
 All other files in this repository are public domain.
+
+Updated 5/30/2019 to include TinyUSB drive capability.

@@ -23,6 +23,9 @@
 //Enables Touch Controls
 #define USE_TOUCH 1
 
+//Enable USB drive
+#define USE_USB 1
+
 //Pin numbers
 #define BLUEFRUIT_SPI_CS   8
 #define BLUEFRUIT_SPI_IRQ  7
@@ -156,6 +159,7 @@ void Cooperate(void) {
     pSeconds= Seconds; 
     updateDisplay();
   }
+  delay(10);
 }
 
 //main setup
@@ -386,5 +390,3 @@ void loop() {
   //if necessary, update display
   Cooperate();
 }
-
-
